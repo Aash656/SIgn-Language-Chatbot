@@ -1,0 +1,10 @@
+# image-related
+tensorflow==2.12.0
+keras==2.12.0
+
+# nlp-related
+transformers
+datasets
+scikit-learn
+pandas
+
