@@ -1,15 +1,13 @@
 from transformers import T5Tokenizer, T5ForConditionalGeneration, Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq
 from datasets import load_dataset, DatasetDict
-import pandas as pd
 import torch
 
-# Load your CSVs into Hugging Face Datasets format
-train_df = pd.read_csv("data/nlp/train.csv")
-eval_df = pd.read_csv("data/nlp/eval.csv")
-
+# Load ASLG-PC12 dataset from Hugging Face and split into train/validation
+raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
+dataset = raw_dataset.train_test_split(test_size=0.1, seed=42)
 dataset = DatasetDict({
-    "train": load_dataset("csv", data_files="data/nlp/train.csv")["train"],
-    "validation": load_dataset("csv", data_files="data/nlp/eval.csv")["train"]
+    "train": dataset["train"],
+    "validation": dataset["test"]
 })
 
 # Load model and tokenizer
@@ -22,8 +20,8 @@ max_input_length = 64
 max_target_length = 64
 
 def preprocess(example):
-    inputs = tokenizer(example["input"], padding="max_length", truncation=True, max_length=max_input_length)
-    targets = tokenizer(example["target"], padding="max_length", truncation=True, max_length=max_target_length)
+    inputs = tokenizer(example["gloss"], padding="max_length", truncation=True, max_length=max_input_length)
+    targets = tokenizer(example["text"], padding="max_length", truncation=True, max_length=max_target_length)
     inputs["labels"] = targets["input_ids"]
     return inputs
 
@@ -61,3 +59,4 @@ trainer.train()
 # Save final model
 trainer.save_model("models/nlp_model/T5model")
 tokenizer.save_pretrained("models/nlp_model/T5model")
+
