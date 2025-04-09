@@ -42,19 +42,33 @@ rouge = evaluate.load("rouge")
 # Compute metrics function
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
+
+    # If predictions are logits, get argmax to get token IDs
+    if isinstance(predictions, tuple):
+        predictions = predictions[0]
+
+    # Convert to token IDs if they're still logits
+    if predictions.ndim == 3:
+        predictions = np.argmax(predictions, axis=-1)
+
+    # Replace -100 in labels to pad_token_id (to decode properly)
+    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-    # BLEU expects a list of references (each reference itself a list of tokens)
-    bleu_score = bleu.compute(predictions=[pred.split() for pred in decoded_preds],
-                              references=[[label.split()] for label in decoded_labels])
-    
+    bleu_score = bleu.compute(
+        predictions=[pred.split() for pred in decoded_preds],
+        references=[[label.split()] for label in decoded_labels]
+    )
+
     rouge_result = rouge.compute(predictions=decoded_preds, references=decoded_labels)
 
     return {
         "bleu": bleu_score["bleu"],
         "rougeL": rouge_result["rougeL"]
     }
+
 
 # Training arguments
 training_args = Seq2SeqTrainingArguments(
