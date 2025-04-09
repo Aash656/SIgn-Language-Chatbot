@@ -35,22 +35,29 @@ def clean_gloss(gloss):
     return gloss
 
 def preprocess(example):
-    if isinstance(example["gloss"], str):
-        print(f"Processing gloss: {example['gloss'][:100]}")  # Print first 100 chars of gloss for inspection
+    # If gloss is a list of strings, join them into a single string
+    if isinstance(example["gloss"], list):
+        gloss = " ".join(example["gloss"])  # Join the list into a single string
+        print(f"Joined gloss: {gloss[:100]}")  # Print the first 100 characters of the joined gloss
     else:
-        print(f"Skipping invalid gloss: {example['gloss']}")
+        gloss = example["gloss"]
     
-    example["gloss"] = clean_gloss(example["gloss"])  # Clean gloss text
+    # Clean the gloss
+    example["gloss"] = clean_gloss(gloss)
+
+    # Tokenize gloss and text
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
                        max_length=max_input_length, return_token_type_ids=False)
     targets = tokenizer(example["text"], padding="max_length", truncation=True,
                         max_length=max_target_length, return_token_type_ids=False)
+    
     inputs["labels"] = targets["input_ids"]
 
     if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
         print("⚠️ Warning: Found an all-padding input sequence.")
 
     return inputs
+
 
 tokenized_dataset = dataset.map(preprocess, batched=True)
 
