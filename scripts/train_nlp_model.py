@@ -3,19 +3,7 @@ import re
 from transformers import T5Tokenizer, T5ForConditionalGeneration, Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq
 from datasets import load_dataset, DatasetDict
 import evaluate
-import torch
 import numpy as np
-
-# Function to clean gloss
-def clean_gloss(gloss):
-    try:
-        gloss = re.sub(r'X-', '', gloss)  # Clean unwanted X- tokens
-        gloss = re.sub(r'DESC-', '', gloss)  # Clean DESC- tokens
-        gloss = re.sub(r'\n', ' ', gloss)  # Replace newline with space
-        return gloss.strip()
-    except Exception as e:
-        print(f"Error processing gloss: {e}")
-        return gloss  # Return the gloss as is in case of error
 
 # Load ASLG-PC12 dataset from Hugging Face and split into train/validation
 raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
@@ -30,35 +18,51 @@ model_name = "google/flan-t5-small"
 tokenizer = T5Tokenizer.from_pretrained(model_name)
 model = T5ForConditionalGeneration.from_pretrained(model_name)
 
-# Tokenize
+# Define cleaning function for gloss (to remove extra symbols, etc.)
+def clean_gloss(gloss):
+    try:
+        gloss = re.sub(r'X-', '', gloss)  # Remove "X-" which is not meaningful
+        gloss = re.sub(r'\s+', ' ', gloss)  # Collapse multiple spaces
+        return gloss
+    except Exception as e:
+        print(f"Error processing gloss: {e}")
+        return gloss  # Return the original if error occurs
+
+# Preprocessing function to tokenize inputs and targets
 max_input_length = 64
 max_target_length = 64
 
 def preprocess(example):
     try:
-        example["gloss"] = clean_gloss(example["gloss"])  # Clean gloss text
+        # Clean gloss text before tokenization
+        example["gloss"] = clean_gloss(example["gloss"])
     except Exception as e:
-        print(f"Error processing gloss: {e}")  # Log the error
+        print(f"Error processing gloss: {e}")  # Log error
         example["gloss"] = ""  # Default to empty string or handle differently
 
+    # Tokenize the gloss and text
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
-                       max_length=max_input_length, return_token_type_ids=False)
+                       max_length=max_input_length, return_token_type_ids=False, add_special_tokens=True)
     targets = tokenizer(example["text"], padding="max_length", truncation=True,
-                        max_length=max_target_length, return_token_type_ids=False)
+                        max_length=max_target_length, return_token_type_ids=False, add_special_tokens=True)
+
+    # Ensure target sequence is valid
     inputs["labels"] = targets["input_ids"]
 
+    # If all input tokens are pad tokens, log a warning
     if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
         print("⚠️ Warning: Found an all-padding input sequence.")
 
     return inputs
 
-tokenized_dataset = dataset.map(preprocess, batched=True, batch_size=32)  # Adjust batch_size as necessary
+# Tokenize the dataset
+tokenized_dataset = dataset.map(preprocess, batched=True)
 
 # Load metrics
 bleu = evaluate.load("bleu")
 rouge = evaluate.load("rouge")
 
-# Compute metrics function
+# Compute metrics function with bounds checking
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
 
@@ -72,6 +76,10 @@ def compute_metrics(eval_pred):
 
     # Replace -100 in labels to pad_token_id (to decode properly)
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+
+    # Ensure that token IDs are within the valid range for decoding
+    max_token_id = tokenizer.vocab_size - 1  # Get the maximum token id in the vocabulary
+    predictions = np.clip(predictions, 0, max_token_id)  # Clip the predictions to valid range
 
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
