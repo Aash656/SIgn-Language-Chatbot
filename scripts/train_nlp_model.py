@@ -69,7 +69,9 @@ training_args = Seq2SeqTrainingArguments(
     fp16=False,
     max_grad_norm=1.0,
     report_to="wandb",
+    run_name=f"t5-asl-run-{int(time.time())}"
 )
+
 
 # Trainer setup
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
