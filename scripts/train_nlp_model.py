@@ -23,15 +23,17 @@ max_input_length = 64
 max_target_length = 64
 
 def preprocess(example):
-    inputs = tokenizer(example["gloss"], padding="max_length", truncation=True, max_length=max_input_length)
-    targets = tokenizer(example["text"], padding="max_length", truncation=True, max_length=max_target_length)
+    inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
+                       max_length=max_input_length, return_token_type_ids=False)
+    targets = tokenizer(example["text"], padding="max_length", truncation=True,
+                        max_length=max_target_length, return_token_type_ids=False)
     inputs["labels"] = targets["input_ids"]
 
-    # Warn if input is all padding
     if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
         print("⚠️ Warning: Found an all-padding input sequence.")
 
     return inputs
+
 
 tokenized_dataset = dataset.map(preprocess, batched=True)
 
