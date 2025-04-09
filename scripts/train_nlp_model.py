@@ -48,6 +48,8 @@ def preprocess(example):
     # Tokenize gloss and text with consistent max_length
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
                        max_length=max_input_length, return_token_type_ids=False)
+    
+    # Truncate text explicitly to avoid length issues
     targets = tokenizer(example["text"], padding="max_length", truncation=True,
                         max_length=max_target_length, return_token_type_ids=False)
 
@@ -63,6 +65,7 @@ def preprocess(example):
 
     return inputs
 
+# Preprocess and tokenize dataset
 tokenized_dataset = dataset.map(preprocess, batched=True)
 
 # Load metrics
