@@ -62,7 +62,6 @@ tokenized_dataset = dataset.map(preprocess, batched=True)
 bleu = evaluate.load("bleu")
 rouge = evaluate.load("rouge")
 
-# Compute metrics function with bounds checking
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
 
@@ -81,12 +80,18 @@ def compute_metrics(eval_pred):
     max_token_id = tokenizer.vocab_size - 1  # Get the maximum token id in the vocabulary
     predictions = np.clip(predictions, 0, max_token_id)  # Clip the predictions to valid range
 
+    # Decode token IDs to strings
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
+    # Prepare the predictions and references in the expected format
+    # Split each sentence into tokens for BLEU computation
+    decoded_preds = [pred.split() for pred in decoded_preds]
+    decoded_labels = [[label.split()] for label in decoded_labels]  # Make it a list of lists for each reference
+
     bleu_score = bleu.compute(
-        predictions=[pred.split() for pred in decoded_preds],
-        references=[[label.split()] for label in decoded_labels]
+        predictions=decoded_preds,
+        references=decoded_labels
     )
 
     rouge_result = rouge.compute(predictions=decoded_preds, references=decoded_labels)
@@ -95,6 +100,7 @@ def compute_metrics(eval_pred):
         "bleu": bleu_score["bleu"],
         "rougeL": rouge_result["rougeL"]
     }
+
 
 # Training arguments
 training_args = Seq2SeqTrainingArguments(
