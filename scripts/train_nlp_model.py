@@ -45,7 +45,7 @@ def preprocess(example):
     # Clean the gloss
     example["gloss"] = clean_gloss(gloss)
 
-    # Tokenize gloss and text with consistent max_length
+    # Tokenize gloss (input) and text (target) with consistent truncation
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
                        max_length=max_input_length, return_token_type_ids=False)
     
@@ -56,7 +56,7 @@ def preprocess(example):
     # Ensure that the labels are assigned correctly
     inputs["labels"] = targets["input_ids"]
 
-    # If input or target text has a length mismatch, log a message for debugging
+    # Check and debug if there is a target text length mismatch
     if len(targets["input_ids"]) != max_target_length:
         print(f"Warning: Target text length mismatch. Length: {len(targets['input_ids'])}, Text: {example['text'][:100]}")
 
