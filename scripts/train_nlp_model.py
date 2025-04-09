@@ -4,6 +4,7 @@ from datasets import load_dataset, DatasetDict
 import evaluate
 import torch
 import numpy as np
+import re
 
 # Load ASLG-PC12 dataset from Hugging Face and split into train/validation
 raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
@@ -18,26 +19,42 @@ model_name = "google/flan-t5-small"
 tokenizer = T5Tokenizer.from_pretrained(model_name)
 model = T5ForConditionalGeneration.from_pretrained(model_name)
 
-# Tokenize
+# Gloss Preprocessing function
+def clean_gloss(gloss):
+    # Remove 'X-' and other notational symbols (customize based on the dataset)
+    gloss = re.sub(r'X-', '', gloss)
+    gloss = re.sub(r'\s+', ' ', gloss)  # Replace multiple spaces with a single space
+    gloss = gloss.strip()  # Remove leading/trailing whitespace
+    return gloss
+
+# Tokenization function
 max_input_length = 64
 max_target_length = 64
 
 def preprocess(example):
+    # Clean gloss text
+    example["gloss"] = clean_gloss(example["gloss"])
+    
+    # Tokenize gloss and text (using padding, truncation, and max lengths)
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
                        max_length=max_input_length, return_token_type_ids=False)
     targets = tokenizer(example["text"], padding="max_length", truncation=True,
                         max_length=max_target_length, return_token_type_ids=False)
+    
+    # Set targets as labels
     inputs["labels"] = targets["input_ids"]
 
+    # Check for all-padding sequences
     if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
         print("⚠️ Warning: Found an all-padding input sequence.")
 
     return inputs
 
 
+# Tokenize dataset
 tokenized_dataset = dataset.map(preprocess, batched=True)
 
-# Load metrics
+# Load evaluation metrics
 bleu = evaluate.load("bleu")
 rouge = evaluate.load("rouge")
 
@@ -53,12 +70,14 @@ def compute_metrics(eval_pred):
     if predictions.ndim == 3:
         predictions = np.argmax(predictions, axis=-1)
 
-    # Replace -100 in labels to pad_token_id (to decode properly)
+    # Replace -100 in labels with pad_token_id for decoding
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
 
+    # Decode predictions and labels
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
+    # Calculate BLEU and ROUGE scores
     bleu_score = bleu.compute(
         predictions=[pred.split() for pred in decoded_preds],
         references=[[label.split()] for label in decoded_labels]
@@ -89,10 +108,10 @@ training_args = Seq2SeqTrainingArguments(
     run_name=f"t5-asl-run-{int(time.time())}"
 )
 
-
-# Trainer setup
+# Data collator setup
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
+# Trainer setup
 trainer = Seq2SeqTrainer(
     model=model,
     args=training_args,
@@ -106,6 +125,6 @@ trainer = Seq2SeqTrainer(
 # Train the model
 trainer.train()
 
-# Save final model
+# Save the final model and tokenizer
 trainer.save_model("models/nlp_model/T5model")
 tokenizer.save_pretrained("models/nlp_model/T5model")
