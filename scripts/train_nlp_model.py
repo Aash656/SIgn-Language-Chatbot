@@ -51,6 +51,7 @@ trainer = Seq2SeqTrainer(
     eval_dataset=tokenized_dataset["validation"],
     tokenizer=tokenizer,
     data_collator=data_collator,
+    max_grad_norm=1.0
 )
 
 # Train the model
