@@ -43,8 +43,9 @@ training_args = Seq2SeqTrainingArguments(
     save_total_limit=1,
     num_train_epochs=5,
     predict_with_generate=True,
-    fp16=False,  # changed this
-    max_grad_norm=1.0
+    fp16=False,
+    max_grad_norm=1.0,
+    report_to="wandb",
 )
 
 # Trainer setup
