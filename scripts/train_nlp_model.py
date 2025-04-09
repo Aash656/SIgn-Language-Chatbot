@@ -39,6 +39,7 @@ training_args = Seq2SeqTrainingArguments(
     num_train_epochs=5,
     predict_with_generate=True,
     fp16=torch.cuda.is_available(),
+    max_grad_norm=1.0
 )
 
 # Trainer setup
@@ -51,7 +52,6 @@ trainer = Seq2SeqTrainer(
     eval_dataset=tokenized_dataset["validation"],
     tokenizer=tokenizer,
     data_collator=data_collator,
-    max_grad_norm=1.0
 )
 
 # Train the model
