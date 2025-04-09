@@ -20,8 +20,8 @@ tokenizer = T5Tokenizer.from_pretrained(model_name)
 model = T5ForConditionalGeneration.from_pretrained(model_name)
 
 # Tokenize
-max_input_length = 64
-max_target_length = 64
+max_input_length = 1000  # Increase max_input_length to 1000
+max_target_length = 1000  # Increase max_target_length to 1000
 
 def clean_gloss(gloss):
     if not isinstance(gloss, str):
@@ -35,28 +35,29 @@ def clean_gloss(gloss):
     return gloss
 
 def preprocess(example):
+    # If gloss is a list of strings, join them into a single string
     if isinstance(example["gloss"], list):
-        gloss = " ".join(example["gloss"])
+        gloss = " ".join(example["gloss"])  # Join the list into a single string
+        print(f"Joined gloss: {gloss[:100]}")  # Print the first 100 characters of the joined gloss
     else:
         gloss = example["gloss"]
+    
+    # Clean the gloss
+    example["gloss"] = clean_gloss(gloss)
 
-    gloss = clean_gloss(gloss)
-
-    inputs = tokenizer(gloss, padding="max_length", truncation=True,
+    # Tokenize gloss and text with consistent max_length
+    inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
                        max_length=max_input_length, return_token_type_ids=False)
     targets = tokenizer(example["text"], padding="max_length", truncation=True,
                         max_length=max_target_length, return_token_type_ids=False)
-
-    # Log the lengths for debugging
-    print(f"Gloss length: {len(inputs['input_ids'])}, Text length: {len(targets['input_ids'])}")
     
+    # Ensure that the labels are assigned correctly
     inputs["labels"] = targets["input_ids"]
 
     if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
         print("⚠️ Warning: Found an all-padding input sequence.")
 
     return inputs
-
 
 
 tokenized_dataset = dataset.map(preprocess, batched=True)
