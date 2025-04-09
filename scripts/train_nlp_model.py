@@ -6,6 +6,17 @@ import evaluate
 import torch
 import numpy as np
 
+# Function to clean gloss
+def clean_gloss(gloss):
+    try:
+        gloss = re.sub(r'X-', '', gloss)  # Clean unwanted X- tokens
+        gloss = re.sub(r'DESC-', '', gloss)  # Clean DESC- tokens
+        gloss = re.sub(r'\n', ' ', gloss)  # Replace newline with space
+        return gloss.strip()
+    except Exception as e:
+        print(f"Error processing gloss: {e}")
+        return gloss  # Return the gloss as is in case of error
+
 # Load ASLG-PC12 dataset from Hugging Face and split into train/validation
 raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
 dataset = raw_dataset.train_test_split(test_size=0.1, seed=42)
@@ -23,24 +34,13 @@ model = T5ForConditionalGeneration.from_pretrained(model_name)
 max_input_length = 64
 max_target_length = 64
 
-def clean_gloss(gloss):
-    if not isinstance(gloss, str):
-        print(f"Skipping non-string gloss: {gloss}")
-        return ""  # Return an empty string or handle the case accordingly
-
-    gloss = re.sub(r'X-', '', gloss)  # Remove 'X-' from gloss
-    gloss = re.sub(r'\n', ' ', gloss)  # Optional: Remove newline characters
-    gloss = gloss.strip()  # Optional: Strip leading/trailing whitespaces
-
-    return gloss
-
 def preprocess(example):
-    if isinstance(example["gloss"], str):
-        print(f"Processing gloss: {example['gloss'][:100]}")  # Print first 100 chars of gloss for inspection
-    else:
-        print(f"Skipping invalid gloss: {example['gloss']}")
-    
-    example["gloss"] = clean_gloss(example["gloss"])  # Clean gloss text
+    try:
+        example["gloss"] = clean_gloss(example["gloss"])  # Clean gloss text
+    except Exception as e:
+        print(f"Error processing gloss: {e}")  # Log the error
+        example["gloss"] = ""  # Default to empty string or handle differently
+
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
                        max_length=max_input_length, return_token_type_ids=False)
     targets = tokenizer(example["text"], padding="max_length", truncation=True,
@@ -52,7 +52,7 @@ def preprocess(example):
 
     return inputs
 
-tokenized_dataset = dataset.map(preprocess, batched=True)
+tokenized_dataset = dataset.map(preprocess, batched=True, batch_size=32)  # Adjust batch_size as necessary
 
 # Load metrics
 bleu = evaluate.load("bleu")
