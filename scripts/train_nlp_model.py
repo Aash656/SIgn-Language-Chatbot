@@ -1,6 +1,7 @@
 from transformers import T5Tokenizer, T5ForConditionalGeneration, Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset, DatasetDict, load_metric
 import torch
+import numpy as np
 
 # Load ASLG-PC12 dataset from Hugging Face and split into train/validation
 raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
@@ -32,6 +33,27 @@ def preprocess(example):
 
 tokenized_dataset = dataset.map(preprocess, batched=True)
 
+# Define metrics
+bleu = load_metric("bleu")
+rouge = load_metric("rouge")
+
+def compute_metrics(eval_preds):
+    preds, labels = eval_preds
+    decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+    decoded_preds_tokens = [pred.strip().split() for pred in decoded_preds]
+    decoded_labels_tokens = [[label.strip().split()] for label in decoded_labels]
+
+    bleu_result = bleu.compute(predictions=decoded_preds_tokens, references=decoded_labels_tokens)
+    rouge_result = rouge.compute(predictions=[" ".join(p) for p in decoded_preds_tokens],
+                                 references=[" ".join(l[0]) for l in decoded_labels_tokens])
+
+    return {
+        "bleu": bleu_result["bleu"],
+        "rougeL": rouge_result["rougeL"].mid.fmeasure,
+    }
+
 # Training arguments
 training_args = Seq2SeqTrainingArguments(
     output_dir="models/nlp/model_args",
@@ -58,6 +80,7 @@ trainer = Seq2SeqTrainer(
     eval_dataset=tokenized_dataset["validation"],
     tokenizer=tokenizer,
     data_collator=data_collator,
+    compute_metrics=compute_metrics,
 )
 
 # Train the model
