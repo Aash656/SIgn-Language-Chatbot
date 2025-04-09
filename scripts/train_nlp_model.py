@@ -49,19 +49,16 @@ def preprocess(example):
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True,
                        max_length=max_input_length, return_token_type_ids=False)
     
-    # Truncate text explicitly to avoid length issues
+    # Tokenize text (target) and apply truncation
     targets = tokenizer(example["text"], padding="max_length", truncation=True,
                         max_length=max_target_length, return_token_type_ids=False)
 
     # Ensure that the labels are assigned correctly
     inputs["labels"] = targets["input_ids"]
 
-    # Ensure that the target text is properly tokenized and its length is valid
+    # If input or target text has a length mismatch, log a message for debugging
     if len(targets["input_ids"]) != max_target_length:
-        print(f"Warning: Target text length mismatch. Length: {len(targets['input_ids'])}.")
-
-    if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
-        print("⚠️ Warning: Found an all-padding input sequence.")
+        print(f"Warning: Target text length mismatch. Length: {len(targets['input_ids'])}, Text: {example['text'][:100]}")
 
     return inputs
 
