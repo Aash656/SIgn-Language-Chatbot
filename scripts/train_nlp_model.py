@@ -23,6 +23,11 @@ def preprocess(example):
     inputs = tokenizer(example["gloss"], padding="max_length", truncation=True, max_length=max_input_length)
     targets = tokenizer(example["text"], padding="max_length", truncation=True, max_length=max_target_length)
     inputs["labels"] = targets["input_ids"]
+
+    # Warn if input is all padding
+    if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
+        print("⚠️ Warning: Found an all-padding input sequence.")
+
     return inputs
 
 tokenized_dataset = dataset.map(preprocess, batched=True)
@@ -38,7 +43,7 @@ training_args = Seq2SeqTrainingArguments(
     save_total_limit=1,
     num_train_epochs=5,
     predict_with_generate=True,
-    fp16=torch.cuda.is_available(),
+    fp16=False,  # changed this
     max_grad_norm=1.0
 )
 
@@ -60,4 +65,3 @@ trainer.train()
 # Save final model
 trainer.save_model("models/nlp_model/T5model")
 tokenizer.save_pretrained("models/nlp_model/T5model")
-
