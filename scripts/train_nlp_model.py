@@ -47,6 +47,7 @@ def preprocess(example):
     return inputs
 
 tokenized_dataset = dataset.map(preprocess, batched=False)
+global_tokenizer = tokenizer
 
 # Load metrics
 bleu = evaluate.load("bleu")
@@ -58,10 +59,10 @@ def compute_metrics(eval_pred):
         predictions = predictions[0]
     if predictions.ndim == 3:
         predictions = np.argmax(predictions, axis=-1)
-    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+    labels = np.where(labels != -100, labels, global_tokenizer.pad_token_id)
 
-    decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    decoded_preds = global_tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    decoded_labels = global_tokenizer.batch_decode(labels, skip_special_tokens=True)
 
     bleu_score = bleu.compute(
         predictions=[pred.split() for pred in decoded_preds],
@@ -73,6 +74,7 @@ def compute_metrics(eval_pred):
         "bleu": bleu_score["bleu"],
         "rougeL": rouge_result["rougeL"]
     }
+
 
 training_args = Seq2SeqTrainingArguments(
     output_dir="models/nlp/model_args",
@@ -97,7 +99,6 @@ trainer = Seq2SeqTrainer(
     args=training_args,
     train_dataset=tokenized_dataset["train"],
     eval_dataset=tokenized_dataset["validation"],
-    tokenizer=tokenizer,
     data_collator=data_collator,
     compute_metrics=compute_metrics
 )
