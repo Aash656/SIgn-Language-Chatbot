@@ -23,15 +23,12 @@ model = T5ForConditionalGeneration.from_pretrained(model_name)
 max_input_length = 128
 max_target_length = 128
 
-
-# Gloss text cleaning function
 def clean_gloss(gloss):
     gloss = re.sub(r'X-', '', gloss)
-    gloss = re.sub(r'[-\n]+', ' ', gloss)  # Replace newlines and hyphens with spaces
-    gloss = re.sub(r'\s+', ' ', gloss).strip()  # Normalize whitespace
+    gloss = re.sub(r'[-\n]+', ' ', gloss)
+    gloss = re.sub(r'\s+', ' ', gloss).strip()
     return gloss
 
-# Preprocessing function
 def preprocess(example):
     cleaned_gloss = clean_gloss(example["gloss"])
     input_text = f"translate gloss to english: {cleaned_gloss}"
@@ -49,26 +46,18 @@ def preprocess(example):
 
     return inputs
 
-
 tokenized_dataset = dataset.map(preprocess, batched=False)
 
 # Load metrics
 bleu = evaluate.load("bleu")
 rouge = evaluate.load("rouge")
 
-# Compute metrics function
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-
-    # If predictions are logits, get argmax to get token IDs
     if isinstance(predictions, tuple):
         predictions = predictions[0]
-
-    # Convert to token IDs if they're still logits
     if predictions.ndim == 3:
         predictions = np.argmax(predictions, axis=-1)
-
-    # Replace -100 in labels to pad_token_id (to decode properly)
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
 
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
@@ -78,7 +67,6 @@ def compute_metrics(eval_pred):
         predictions=[pred.split() for pred in decoded_preds],
         references=[[label.split()] for label in decoded_labels]
     )
-
     rouge_result = rouge.compute(predictions=decoded_preds, references=decoded_labels)
 
     return {
@@ -86,7 +74,6 @@ def compute_metrics(eval_pred):
         "rougeL": rouge_result["rougeL"]
     }
 
-# Training arguments
 training_args = Seq2SeqTrainingArguments(
     output_dir="models/nlp/model_args",
     evaluation_strategy="epoch",
@@ -103,29 +90,18 @@ training_args = Seq2SeqTrainingArguments(
     run_name=f"t5-asl-run-{int(time.time())}"
 )
 
-# Trainer setup
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
-
-# Create a custom processing class to avoid the deprecation warning
-from transformers import PreTrainedTokenizerFast
-
-class TokenizerProcessing(PreTrainedTokenizerFast):
-    pass
 
 trainer = Seq2SeqTrainer(
     model=model,
     args=training_args,
     train_dataset=tokenized_dataset["train"],
     eval_dataset=tokenized_dataset["validation"],
-    tokenizer=tokenizer,  # Keep tokenizer as is
+    tokenizer=tokenizer,
     data_collator=data_collator,
-    compute_metrics=compute_metrics,
-    processing_class=TokenizerProcessing  # New parameter to avoid deprecated warning
+    compute_metrics=compute_metrics
 )
 
-# Train the model
 trainer.train()
-
-# Save final model
 trainer.save_model("models/nlp_model/T5model")
 tokenizer.save_pretrained("models/nlp_model/T5model")
