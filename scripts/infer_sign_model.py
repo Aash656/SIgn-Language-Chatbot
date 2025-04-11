@@ -21,7 +21,7 @@ def preprocess_image(img_path, img_size=224):
     return img
 
 # Function to classify all images in a folder (in number-wise order)
-def classify_images_in_folder(folder_path, threshold=None):
+def classify_images_in_folder(folder_path, threshold=0.85):
     label_outputs = []
 
     # Get sorted list of filenames based on number in filename
