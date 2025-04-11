@@ -21,7 +21,7 @@ def preprocess_image(img_path, img_size=224):
     return img
 
 # Function to classify all images in a folder (in number-wise order)
-def classify_images_in_folder(folder_path):
+def classify_images_in_folder(folder_path, threshold=None):
     label_outputs = []
 
     # Get sorted list of filenames based on number in filename
@@ -33,9 +33,15 @@ def classify_images_in_folder(folder_path):
         img = preprocess_image(img_path)
         prediction = model.predict(img, verbose=0)
         class_index = np.argmax(prediction)
-        label_outputs.append(labels[class_index])
-    
+        confidence = prediction[0][class_index]
+
+        if threshold is not None and confidence < threshold:
+            label_outputs.append("UNKNOWN")
+        else:
+            label_outputs.append(labels[class_index])
+
     return label_outputs
+
 
 # Example usage
 folder_path = "data/signs"
