@@ -20,8 +20,9 @@ tokenizer = T5Tokenizer.from_pretrained(model_name)
 model = T5ForConditionalGeneration.from_pretrained(model_name)
 
 # Tokenize
-max_input_length = 64
-max_target_length = 64
+max_input_length = 128
+max_target_length = 128
+
 
 # Gloss text cleaning function
 def clean_gloss(gloss):
@@ -33,19 +34,23 @@ def clean_gloss(gloss):
 # Preprocessing function
 def preprocess(example):
     cleaned_gloss = clean_gloss(example["gloss"])
-    
-    inputs = tokenizer(cleaned_gloss, padding="max_length", truncation=True,
-                       max_length=max_input_length, return_token_type_ids=False)
-    targets = tokenizer(example["text"], padding="max_length", truncation=True,
-                        max_length=max_target_length, return_token_type_ids=False)
-    inputs["labels"] = targets["input_ids"]
+    input_text = f"translate gloss to english: {cleaned_gloss}"
+    target_text = example["text"].strip()
 
-    if all(token_id == tokenizer.pad_token_id for token_id in inputs["input_ids"]):
-        print("⚠️ Warning: Found an all-padding input sequence.")
-    
+    inputs = tokenizer(input_text, padding="max_length", truncation=True,
+                       max_length=max_input_length, return_token_type_ids=False)
+
+    targets = tokenizer(target_text, padding="max_length", truncation=True,
+                        max_length=max_target_length, return_token_type_ids=False)
+
+    labels = targets["input_ids"]
+    labels = [label if label != tokenizer.pad_token_id else -100 for label in labels]
+    inputs["labels"] = labels
+
     return inputs
 
-tokenized_dataset = dataset.map(preprocess, batched=True)
+
+tokenized_dataset = dataset.map(preprocess, batched=False)
 
 # Load metrics
 bleu = evaluate.load("bleu")
