@@ -4,9 +4,10 @@ from datasets import load_dataset, DatasetDict
 from huggingface_hub import login, create_repo, Repository
 import torch
 import re
+import os
 
 # Login to Hugging Face
-login()
+login(token=os.environ["HUGGINGFACE_HUB_TOKEN"])
 
 # Load the dataset and split it
 raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
