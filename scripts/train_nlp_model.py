@@ -1,13 +1,10 @@
 import time
 from transformers import T5Tokenizer, T5ForConditionalGeneration, Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq
 from datasets import load_dataset, DatasetDict
-from huggingface_hub import login, create_repo, Repository
+from huggingface_hub import create_repo, Repository
 import torch
 import re
-import os
 
-# Login to Hugging Face
-login(token=os.environ["HUGGINGFACE_HUB_TOKEN"])
 
 # Load the dataset and split it
 raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
