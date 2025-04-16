@@ -1,12 +1,14 @@
 import time
 from transformers import T5Tokenizer, T5ForConditionalGeneration, Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq
 from datasets import load_dataset, DatasetDict
-import evaluate
+from huggingface_hub import login, create_repo, Repository
 import torch
-import numpy as np
 import re
 
-# Load ASLG-PC12 dataset from Hugging Face and split into train/validation
+# Login to Hugging Face
+login()
+
+# Load the dataset and split it
 raw_dataset = load_dataset("achrafothman/aslg_pc12")["train"]
 dataset = raw_dataset.train_test_split(test_size=0.1, seed=42)
 dataset = DatasetDict({
@@ -19,7 +21,7 @@ model_name = "google/flan-t5-small"
 tokenizer = T5Tokenizer.from_pretrained(model_name)
 model = T5ForConditionalGeneration.from_pretrained(model_name)
 
-# Tokenize
+# Preprocessing functions
 max_input_length = 128
 max_target_length = 128
 
@@ -46,13 +48,13 @@ def preprocess(example):
 
     return inputs
 
+# Tokenize dataset
 tokenized_dataset = dataset.map(preprocess, batched=False)
 global_tokenizer = tokenizer
 
-
+# Training arguments (removed invalid key)
 training_args = Seq2SeqTrainingArguments(
     output_dir="models/nlp/model_args",
-    evaluation_strategy="epoch",
     learning_rate=2e-5,
     per_device_train_batch_size=4,
     per_device_eval_batch_size=4,
@@ -62,8 +64,8 @@ training_args = Seq2SeqTrainingArguments(
     predict_with_generate=True,
     fp16=False,
     max_grad_norm=1.0,
-    report_to="wandb",
-    run_name=f"t5-asl-run-{int(time.time())}"
+    logging_dir="logs",
+    report_to="none",  # or "wandb" if using Weights & Biases
 )
 
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
@@ -76,6 +78,21 @@ trainer = Seq2SeqTrainer(
     data_collator=data_collator
 )
 
+# Train and save
 trainer.train()
-trainer.save_model("models/nlp_model/T5model")
-tokenizer.save_pretrained("models/nlp_model/T5model")
+
+save_path = "models/nlp_model/T5model"
+trainer.save_model(save_path)
+tokenizer.save_pretrained(save_path)
+
+# Upload to Hugging Face
+model_repo_name = "t5-gloss2english"
+hf_username = "Aash656"
+
+create_repo(name=model_repo_name, exist_ok=True)
+repo_url = f"https://huggingface.co/{hf_username}/{model_repo_name}"
+repo = Repository(local_dir=save_path, clone_from=repo_url)
+
+repo.git_add()
+repo.git_commit("Add fine-tuned T5 model for gloss-to-English")
+repo.git_push()
